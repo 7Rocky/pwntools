@@ -14,9 +14,19 @@ type ProcessConf struct {
 func process(cmd *exec.Cmd) *Conn {
 	p := Progress(fmt.Sprintf("Starting local process '%s'", cmd.Path))
 
-	stdin, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
-	conn := Conn{stdin: stdin, stdout: stdout}
+	stdin, err := cmd.StdinPipe()
+
+	if err != nil {
+		Error(err.Error())
+	}
+
+	stdout, err := cmd.StdoutPipe()
+
+	if err != nil {
+		Error(err.Error())
+	}
+
+	conn := Conn{stdin: stdin, stdout: stdout, errChan: make(chan error)}
 
 	cmd.Start()
 	go wait(cmd, &conn)
@@ -55,7 +65,10 @@ func ProcessWithConf(argv []string, conf ProcessConf) *Conn {
 
 func wait(cmd *exec.Cmd, conn *Conn) {
 	if err := cmd.Wait(); err != nil {
-		Warning("Command finished with error: %v", err)
-		conn.toClose = true
+		Info("Process '%s' stopped with %s (pid %d)", info.command, err.Error(), info.pid)
+
+		if !conn.isClosed {
+			conn.errChan <- err
+		}
 	}
 }

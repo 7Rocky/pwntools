@@ -7,19 +7,19 @@ import (
 )
 
 const (
-	RESET = "\x1b[0m"
+	reset = "\x1b[0m"
 
-	BLUE   = "\x1b[0;34;1m"
-	GREEN  = "\x1b[0;32;1m"
-	RED    = "\x1b[0;31;1m"
-	YELLOW = "\x1b[0;33;1m"
+	blue   = "\x1b[0;34;1m"
+	green  = "\x1b[0;32;1m"
+	red    = "\x1b[0;31;1m"
+	yellow = "\x1b[0;33;1m"
 
-	RED_BG = "\x1b[0;41m"
+	redBg = "\x1b[0;41m"
 )
 
-type ProgressBar struct {
-	Title      string
-	LastStatus string
+type progressBar struct {
+	title      string
+	lastStatus string
 }
 
 func init() {
@@ -34,74 +34,73 @@ func padding(next, prev string) string {
 	return ""
 }
 
-func Progress(title string) ProgressBar {
+func Progress(title string) progressBar {
 	if context.LogLevel <= INFO {
-		fmt.Printf("[%s*%s] %s\r", BLUE, RESET, title)
-		return ProgressBar{Title: title, LastStatus: ""}
+		fmt.Printf("[%s*%s] %s\r", blue, reset, title)
+		return progressBar{title: title, lastStatus: ""}
 	}
 
-	return ProgressBar{}
+	return progressBar{}
 }
 
-func (p *ProgressBar) Status(status string) {
+func (p *progressBar) Status(status string) {
 	if context.LogLevel <= INFO {
-		fmt.Printf("[%s*%s] %s: %s%s\r", BLUE, RESET, p.Title, status, padding(status, p.LastStatus))
-		p.LastStatus = status
-	}
-}
-
-func (p *ProgressBar) Success(status string) {
-	if context.LogLevel <= INFO {
-		fmt.Printf("[%s+%s] %s: %s%s\n", GREEN, RESET, p.Title, status, padding(status, p.LastStatus))
+		fmt.Printf("[%s*%s] %s: %s%s\r", blue, reset, p.title, status, padding(status, p.lastStatus))
+		p.lastStatus = status
 	}
 }
 
-func (p *ProgressBar) Failure(status string) {
+func (p *progressBar) Success(status string) {
 	if context.LogLevel <= INFO {
-		fmt.Printf("[%s-%s] %s: %s%s\n", RED, RESET, p.Title, status, padding(status, p.LastStatus))
+		fmt.Printf("[%s+%s] %s: %s%s\n", green, reset, p.title, status, padding(status, p.lastStatus))
+	}
+}
+
+func (p *progressBar) Failure(status string) {
+	if context.LogLevel <= INFO {
+		fmt.Printf("[%s-%s] %s: %s%s\n", red, reset, p.title, status, padding(status, p.lastStatus))
 	}
 }
 
 func Critical(format string, v ...any) {
 	if context.LogLevel <= CRITICAL {
-		log.Printf("[%sCRITICAL%s] "+format, append([]any{RED_BG, RESET}, v...)...)
+		log.Printf("[%sCRITICAL%s] "+format, append([]any{redBg, reset}, v...)...)
 	}
 }
 
 func Debug(format string, v ...any) {
 	if context.LogLevel <= DEBUG {
-		log.Printf("[%sDEBUG%s] "+format, append([]any{RED, RESET}, v...)...)
+		log.Printf("[%sDEBUG%s] "+format, append([]any{red, reset}, v...)...)
 		panic(fmt.Sprintf(format, v...))
 	}
 }
 
 func Error(format string, v ...any) {
 	if context.LogLevel <= ERROR {
-		log.Printf("[%sERROR%s] "+format, append([]any{RED_BG, RESET}, v...)...)
-		panic(fmt.Sprintf(format, v...))
+		log.Fatalf("[%sERROR%s] "+format, append([]any{redBg, reset}, v...)...)
 	}
 }
 
 func Failure(format string, v ...any) {
 	if context.LogLevel <= ERROR {
-		log.Printf("[%s-%s] "+format, append([]any{RED, RESET}, v...)...)
+		log.Printf("[%s-%s] "+format, append([]any{red, reset}, v...)...)
 	}
 }
 
 func Info(format string, v ...any) {
 	if context.LogLevel <= INFO {
-		log.Printf("[%s*%s] "+format, append([]any{BLUE, RESET}, v...)...)
+		log.Printf("[%s*%s] "+format, append([]any{blue, reset}, v...)...)
 	}
 }
 
 func Success(format string, v ...any) {
 	if context.LogLevel <= INFO {
-		log.Printf("[%s+%s] "+format, append([]any{GREEN, RESET}, v...)...)
+		log.Printf("[%s+%s] "+format, append([]any{green, reset}, v...)...)
 	}
 }
 
 func Warning(format string, v ...any) {
 	if context.LogLevel <= WARNING {
-		log.Printf("[%s!%s] "+format, append([]any{YELLOW, RESET}, v...)...)
+		log.Printf("[%s!%s] "+format, append([]any{yellow, reset}, v...)...)
 	}
 }

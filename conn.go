@@ -2,16 +2,18 @@ package pwntools
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"time"
 )
 
 type Conn struct {
 	stdin    io.WriteCloser
 	stdout   io.ReadCloser
-	toClose  bool
 	isClosed bool
+	errChan  chan error
 }
 
 type connInfo struct {
@@ -19,7 +21,7 @@ type connInfo struct {
 	pid       int
 	host      string
 	port      string
-	isLocal   bool
+	isListen  bool
 	isProcess bool
 	isRemote  bool
 }
@@ -29,53 +31,53 @@ var info connInfo
 func (conn *Conn) Interactive() {
 	Info("Switching to interactive mode")
 
-	ch := make(chan error)
-
-	go func() {
-		_, err := io.Copy(conn.stdin, os.Stdin)
-		if err != nil {
-			ch <- err
-		}
-	}()
-
-	go func() {
-		_, err := io.Copy(os.Stdout, conn.stdout)
-		if err != nil {
-			ch <- err
-		}
-	}()
+	finish := make(chan struct{})
+	syscall.SetNonblock(0, true)
 
 	go func() {
 		for {
-			time.Sleep(500 * time.Millisecond)
-			ch <- nil
+			select {
+			case <-finish:
+				return
+			default:
+				os.Stdin.WriteTo(conn.stdin)
+			}
 		}
 	}()
 
-	for {
-		if conn.toClose {
-			break
-		}
+	go func() {
+		os.Stdout.ReadFrom(conn.stdout)
+		conn.errChan <- fmt.Errorf("EOF")
+	}()
 
-		if <-ch != nil {
-			conn.toClose = true
+	for {
+		if <-conn.errChan != nil {
+			os.Stdin.SetDeadline(time.Now())
+			finish <- struct{}{}
+			break
 		}
 	}
 
 	Info("Got EOF while reading in interactive")
+
+	syscall.SetNonblock(0, false)
+	close(finish)
+	conn.Close()
 }
 
 func (conn *Conn) Close() {
 	if !conn.isClosed {
+		conn.isClosed = true
+
 		conn.stdin.Close()
 		conn.stdout.Close()
-		conn.isClosed = true
+		close(conn.errChan)
 
 		if info.isProcess {
 			Info("Stopped process '%s' (pid %d)\n", info.command, info.pid)
 		} else if info.isRemote {
 			Info("Closed connection to %s port %s\n", info.host, info.port)
-		} else if info.isLocal {
+		} else if info.isListen {
 			Info("Closed connection to %s port %s\n", info.host, info.port)
 		}
 	}
@@ -94,7 +96,7 @@ func (conn *Conn) Recv(n ...int) []byte {
 	read, err := conn.stdout.Read(buf)
 
 	if err != nil {
-		panic(err)
+		Error(err.Error())
 	}
 
 	return buf[:read]
@@ -105,7 +107,7 @@ func (conn *Conn) RecvN(n int) []byte {
 	read, err := conn.stdout.Read(buf)
 
 	if err != nil {
-		panic(err)
+		Error(err.Error())
 	}
 
 	if read == n {
@@ -144,8 +146,10 @@ func (conn *Conn) RecvLine() []byte {
 
 func (conn *Conn) RecvLineContains(pattern []byte) []byte {
 	var recv []byte
+
 	for {
 		recv = append(recv, conn.RecvLine()...)
+
 		if bytes.Contains(recv, pattern) {
 			return recv
 		}
@@ -156,7 +160,7 @@ func (conn *Conn) Send(data []byte) int {
 	n, err := conn.stdin.Write(data)
 
 	if err != nil {
-		panic(err)
+		Error(err.Error())
 	}
 
 	return n

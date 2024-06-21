@@ -7,10 +7,10 @@ import (
 )
 
 type RemoteConf struct {
-	protocol string
+	Protocol string
 }
 
-func remote[V Number](host string, port V, protocol string) *Conn {
+func remote[V number](host string, port V, protocol string) *Conn {
 	info = connInfo{host: host, port: fmt.Sprintf("%v", port), isRemote: true}
 	p := Progress(fmt.Sprintf("Opening connection to %s on port %s", info.host, info.port))
 
@@ -23,19 +23,15 @@ func remote[V Number](host string, port V, protocol string) *Conn {
 
 	stdin := io.WriteCloser(c)
 	stdout := io.ReadCloser(c)
-
 	p.Success("Done")
-	return &Conn{stdin: stdin, stdout: stdout}
+
+	return &Conn{stdin: stdin, stdout: stdout, errChan: make(chan error)}
 }
 
-func Remote[V Number](host string, port V) *Conn {
+func Remote[V number](host string, port V) *Conn {
 	return remote(host, port, "tcp")
 }
 
-func RemoteWithConf[V Number](host string, port V, conf RemoteConf) *Conn {
-	if conf.protocol != "tcp" {
-		return remote(host, port, conf.protocol)
-	}
-
-	return Remote(host, port)
+func RemoteWithConf[V number](host string, port V, conf RemoteConf) *Conn {
+	return remote(host, port, conf.Protocol)
 }
