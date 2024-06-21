@@ -176,6 +176,12 @@ func (conn *Conn) SendLineAfter(pattern, data []byte) []byte {
 	return recv
 }
 
+func (conn *Conn) SendAfter(pattern, data []byte) []byte {
+	recv := conn.RecvUntil(pattern)
+	conn.Send(data)
+	return recv
+}
+
 func (conn *Conn) RecvS(max ...int) string {
 	return string(conn.Recv(max...))
 }
