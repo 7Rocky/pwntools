@@ -1,12 +1,16 @@
 package pwntools
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"syscall"
 	"time"
+
+	"os/signal"
 )
 
 type Conn struct {
@@ -27,40 +31,85 @@ type connInfo struct {
 }
 
 var info connInfo
+var mutex sync.Mutex
 
-func (conn *Conn) Interactive() {
-	Info("Switching to interactive mode")
+func (conn *Conn) writeInteractive(prompt string) {
+	for {
+		b := conn.Recv()
 
-	finish := make(chan struct{})
-	syscall.SetNonblock(0, true)
+		if len(b) == 0 {
+			conn.errChan <- fmt.Errorf("EOF")
+			return
+		}
 
-	go func() {
-		for {
-			select {
-			case <-finish:
-				return
-			default:
-				os.Stdin.WriteTo(conn.stdin)
+		fmt.Print("\r")
+		os.Stdout.Write(b)
+		fmt.Print(prompt)
+	}
+}
+
+func (conn *Conn) readInteractive(reader *bufio.Reader, finish chan struct{}, prompt string) {
+	for {
+		select {
+		case <-finish:
+			return
+		default:
+			s, _ := reader.ReadString('\n')
+
+			if len(s) > 0 {
+				conn.Send([]byte(s))
+				fmt.Print(prompt)
 			}
 		}
-	}()
+	}
+}
+
+func (conn *Conn) Interactive(prompt ...string) {
+	Info("Switching to interactive mode")
+
+	if len(prompt) == 0 {
+		prompt = append(prompt, fmt.Sprintf("%s$%s ", red, reset))
+	}
+
+	fmt.Print(prompt[0])
+
+	finish := make(chan struct{}, 1)
+	c := make(chan os.Signal, 1)
+
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
-		os.Stdout.ReadFrom(conn.stdout)
-		conn.errChan <- fmt.Errorf("EOF")
+		<-c
+		conn.errChan <- fmt.Errorf("Control-C")
 	}()
 
+	syscall.SetNonblock(int(os.Stdin.Fd()), true)
+	reader := bufio.NewReader(os.Stdin)
+
+	go conn.writeInteractive(prompt[0])
+	go conn.readInteractive(reader, finish, prompt[0])
+
 	for {
-		if <-conn.errChan != nil {
+		err := <-conn.errChan
+
+		if err != nil {
+			if err.Error() == "EOF" {
+				Info("Got EOF while reading in interactive")
+			}
+
+			if err.Error() == "Control-C" {
+				Info("Interrupted")
+			}
+
 			os.Stdin.SetDeadline(time.Now())
 			finish <- struct{}{}
+			time.Sleep(10 * time.Millisecond)
 			break
 		}
 	}
 
-	Info("Got EOF while reading in interactive")
+	syscall.SetNonblock(int(os.Stdin.Fd()), false)
 
-	syscall.SetNonblock(0, false)
 	close(finish)
 	conn.Close()
 }
@@ -71,7 +120,6 @@ func (conn *Conn) Close() {
 
 		conn.stdin.Close()
 		conn.stdout.Close()
-		close(conn.errChan)
 
 		if info.isProcess {
 			Info("Stopped process '%s' (pid %d)\n", info.command, info.pid)
@@ -96,7 +144,7 @@ func (conn *Conn) Recv(n ...int) []byte {
 	read, err := conn.stdout.Read(buf)
 
 	if err != nil {
-		Error(err.Error())
+		return []byte{}
 	}
 
 	return buf[:read]
@@ -119,17 +167,17 @@ func (conn *Conn) RecvN(n int) []byte {
 
 func (conn *Conn) RecvUntil(pattern []byte, drop ...bool) []byte {
 	var recv []byte
-	buf := make([]byte, 1)
+	b := make([]byte, 1)
 
 	for !bytes.HasSuffix(recv, pattern) {
-		n, err := conn.stdout.Read(buf)
+		n, err := conn.stdout.Read(b)
 
 		if err != nil {
 			panic(err)
 		}
 
 		if n == 1 {
-			recv = append(recv, buf[0])
+			recv = append(recv, b[0])
 		}
 	}
 
@@ -141,7 +189,7 @@ func (conn *Conn) RecvUntil(pattern []byte, drop ...bool) []byte {
 }
 
 func (conn *Conn) RecvLine() []byte {
-	return conn.RecvUntil([]byte("\n"))
+	return conn.RecvUntil([]byte{'\n'})
 }
 
 func (conn *Conn) RecvLineContains(pattern []byte) []byte {

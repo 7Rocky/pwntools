@@ -26,7 +26,7 @@ func process(cmd *exec.Cmd) *Conn {
 		Error(err.Error())
 	}
 
-	conn := Conn{stdin: stdin, stdout: stdout, errChan: make(chan error)}
+	conn := Conn{stdin: stdin, stdout: stdout, errChan: make(chan error, 1)}
 
 	cmd.Start()
 	go wait(cmd, &conn)
@@ -65,10 +65,10 @@ func ProcessWithConf(argv []string, conf ProcessConf) *Conn {
 
 func wait(cmd *exec.Cmd, conn *Conn) {
 	if err := cmd.Wait(); err != nil {
-		Info("Process '%s' stopped with %s (pid %d)", info.command, err.Error(), info.pid)
-
 		if !conn.isClosed {
 			conn.errChan <- err
 		}
+
+		Info("Process '%s' stopped with %s (pid %d)", info.command, err.Error(), info.pid)
 	}
 }

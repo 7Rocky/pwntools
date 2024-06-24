@@ -64,13 +64,13 @@ func (p *progressBar) Failure(status string) {
 
 func Critical(format string, v ...any) {
 	if context.LogLevel <= CRITICAL {
-		log.Printf("[%sCRITICAL%s] "+format, append([]any{redBg, reset}, v...)...)
+		log.Printf("\r[%sCRITICAL%s] "+format, append([]any{redBg, reset}, v...)...)
 	}
 }
 
 func Debug(format string, v ...any) {
 	if context.LogLevel <= DEBUG {
-		log.Printf("[%sDEBUG%s] "+format, append([]any{red, reset}, v...)...)
+		log.Printf("\r[%sDEBUG%s] "+format, append([]any{red, reset}, v...)...)
 		panic(fmt.Sprintf(format, v...))
 	}
 }
@@ -83,24 +83,24 @@ func Error(format string, v ...any) {
 
 func Failure(format string, v ...any) {
 	if context.LogLevel <= ERROR {
-		log.Printf("[%s-%s] "+format, append([]any{red, reset}, v...)...)
+		log.Printf("\r[%s-%s] "+format, append([]any{red, reset}, v...)...)
 	}
 }
 
 func Info(format string, v ...any) {
 	if context.LogLevel <= INFO {
-		log.Printf("[%s*%s] "+format, append([]any{blue, reset}, v...)...)
+		log.Printf("\r[%s*%s] "+format, append([]any{blue, reset}, v...)...)
 	}
 }
 
 func Success(format string, v ...any) {
 	if context.LogLevel <= INFO {
-		log.Printf("[%s+%s] "+format, append([]any{green, reset}, v...)...)
+		log.Printf("\r[%s+%s] "+format, append([]any{green, reset}, v...)...)
 	}
 }
 
 func Warning(format string, v ...any) {
 	if context.LogLevel <= WARNING {
-		log.Printf("[%s!%s] "+format, append([]any{yellow, reset}, v...)...)
+		log.Printf("\r[%s!%s] "+format, append([]any{yellow, reset}, v...)...)
 	}
 }
