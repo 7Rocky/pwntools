@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 
@@ -31,7 +30,6 @@ type connInfo struct {
 }
 
 var info connInfo
-var mutex sync.Mutex
 
 func (conn *Conn) writeInteractive(prompt string) {
 	for {
