@@ -37,7 +37,7 @@ func listen[V number](ip string, port V, protocol string) *Conn {
 	stdin := io.WriteCloser(c)
 	stdout := io.ReadCloser(c)
 
-	return &Conn{stdin: stdin, stdout: stdout, errChan: make(chan error, 1)}
+	return &Conn{stdin: stdin, stdout: stdout, errChan: make(chan error, 1), conn: c}
 }
 
 func Listen[V number](port V) *Conn {

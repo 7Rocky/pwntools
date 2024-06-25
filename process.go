@@ -70,5 +70,6 @@ func wait(cmd *exec.Cmd, conn *Conn) {
 		}
 
 		Info("Process '%s' stopped with %s (pid %d)", info.command, err.Error(), info.pid)
+		cmd.Process.Kill()
 	}
 }

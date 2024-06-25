@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"syscall"
 	"time"
@@ -15,6 +16,7 @@ import (
 type Conn struct {
 	stdin    io.WriteCloser
 	stdout   io.ReadCloser
+	conn     net.Conn
 	isClosed bool
 	errChan  chan error
 }
@@ -46,7 +48,9 @@ func (conn *Conn) writeInteractive(prompt string) {
 	}
 }
 
-func (conn *Conn) readInteractive(reader *bufio.Reader, finish chan struct{}, prompt string) {
+func (conn *Conn) readInteractive(finish chan struct{}, prompt string) {
+	reader := bufio.NewReader(os.Stdin)
+
 	for {
 		select {
 		case <-finish:
@@ -82,10 +86,9 @@ func (conn *Conn) Interactive(prompt ...string) {
 	}()
 
 	syscall.SetNonblock(int(os.Stdin.Fd()), true)
-	reader := bufio.NewReader(os.Stdin)
 
 	go conn.writeInteractive(prompt[0])
-	go conn.readInteractive(reader, finish, prompt[0])
+	go conn.readInteractive(finish, prompt[0])
 
 	for {
 		err := <-conn.errChan
@@ -121,10 +124,13 @@ func (conn *Conn) Close() {
 
 		if info.isProcess {
 			Info("Stopped process '%s' (pid %d)\n", info.command, info.pid)
+			syscall.Kill(info.pid, syscall.SIGKILL)
 		} else if info.isRemote {
 			Info("Closed connection to %s port %s\n", info.host, info.port)
+			conn.conn.Close()
 		} else if info.isListen {
 			Info("Closed connection to %s port %s\n", info.host, info.port)
+			conn.conn.Close()
 		}
 	}
 }

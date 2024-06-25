@@ -25,7 +25,7 @@ func remote[V number](host string, port V, protocol string) *Conn {
 	stdout := io.ReadCloser(c)
 	p.Success("Done")
 
-	return &Conn{stdin: stdin, stdout: stdout, errChan: make(chan error, 1)}
+	return &Conn{stdin: stdin, stdout: stdout, errChan: make(chan error, 1), conn: c}
 }
 
 func Remote[V number](host string, port V) *Conn {
