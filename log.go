@@ -65,13 +65,13 @@ func (p *progressBar) Failure(status string) {
 func Critical(format string, v ...any) {
 	if context.LogLevel <= CRITICAL {
 		log.Printf("\r[%sCRITICAL%s] "+format, append([]any{redBg, reset}, v...)...)
+		panic(fmt.Sprintf(format, v...))
 	}
 }
 
 func Debug(format string, v ...any) {
 	if context.LogLevel <= DEBUG {
 		log.Printf("\r[%sDEBUG%s] "+format, append([]any{red, reset}, v...)...)
-		panic(fmt.Sprintf(format, v...))
 	}
 }
 

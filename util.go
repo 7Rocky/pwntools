@@ -1,6 +1,9 @@
 package pwntools
 
 import (
+	"fmt"
+	"strings"
+
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -127,4 +130,40 @@ func U8(b []byte) uint8 {
 	}
 
 	return b[0]
+}
+
+func raw(ss string) string {
+	lines := strings.Split(ss, "\n")
+	var rawLines []string
+
+	const replace = "\x07a\x08b\x09t\x0an\x0bv\x0cf\x0dr"
+
+	for i, s := range lines {
+		if len(s) == 0 {
+			continue
+		}
+
+		s = strings.ReplaceAll(s, `\`, `\\`)
+		s = strings.ReplaceAll(s, `"`, `\"`)
+
+		for b := byte(0); b < 0x20; b++ {
+			if b >= 7 && b <= 13 {
+				s = strings.ReplaceAll(s, replace[2*(b-7):][:1], `\`+replace[2*(b-7)+1:][:1])
+			} else {
+				s = strings.ReplaceAll(s, string([]byte{b}), fmt.Sprintf(`\x%02x`, b))
+			}
+		}
+
+		for b := byte(0x7f); b != 0; b++ {
+			s = strings.ReplaceAll(s, string([]byte{b}), fmt.Sprintf(`\x%02x`, b))
+		}
+
+		if i == len(lines)-1 {
+			rawLines = append(rawLines, `"`+s+`"`)
+		} else {
+			rawLines = append(rawLines, `"`+s+`\n"`)
+		}
+	}
+
+	return "\t" + strings.Join(rawLines, "\n\t")
 }

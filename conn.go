@@ -151,12 +151,15 @@ func (conn *Conn) Recv(n ...int) []byte {
 		return []byte{}
 	}
 
+	Debug("Received 0x%x bytes:\n%s", read, raw(string(buf[:read])))
+
 	return buf[:read]
 }
 
 func (conn *Conn) RecvN(n int) []byte {
 	buf := make([]byte, n)
 	read, err := conn.stdout.Read(buf)
+	Debug("Received 0x%x bytes:\n%s", read, raw(string(buf)))
 
 	if err != nil {
 		Error(err.Error())
@@ -185,6 +188,8 @@ func (conn *Conn) RecvUntil(pattern []byte, drop ...bool) []byte {
 		}
 	}
 
+	Debug("Received 0x%x bytes:\n%s", len(recv), raw(string(recv)))
+
 	if len(drop) == 1 && drop[0] {
 		return bytes.ReplaceAll(recv, pattern, []byte(""))
 	}
@@ -210,6 +215,7 @@ func (conn *Conn) RecvLineContains(pattern []byte) []byte {
 
 func (conn *Conn) Send(data []byte) int {
 	n, err := conn.stdin.Write(data)
+	Debug("Sent 0x%x bytes:\n%s", n, raw(string(data)))
 
 	if err != nil {
 		Error(err.Error())
