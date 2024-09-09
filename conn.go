@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"syscall"
-	"time"
 
 	"os/signal"
 )
@@ -32,13 +31,14 @@ type connInfo struct {
 }
 
 var info connInfo
+var interactiveConn *Conn = nil
 
-func (conn *Conn) writeInteractive(prompt string) {
+func writeInteractive(prompt string) {
 	for {
-		b := conn.Recv()
+		b := interactiveConn.Recv()
 
 		if len(b) == 0 {
-			conn.errChan <- fmt.Errorf("EOF")
+			interactiveConn.errChan <- fmt.Errorf("EOF")
 			return
 		}
 
@@ -48,20 +48,15 @@ func (conn *Conn) writeInteractive(prompt string) {
 	}
 }
 
-func (conn *Conn) readInteractive(finish chan struct{}, prompt string) {
+func readInteractive(prompt string) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		select {
-		case <-finish:
-			return
-		default:
-			s, _ := reader.ReadString('\n')
+		b, err := reader.ReadBytes('\n')
 
-			if len(s) > 0 {
-				conn.Send([]byte(s))
-				fmt.Print(prompt)
-			}
+		if len(b) > 0 && err == nil {
+			interactiveConn.Send(b)
+			fmt.Print(prompt)
 		}
 	}
 }
@@ -75,9 +70,7 @@ func (conn *Conn) Interactive(prompt ...string) {
 
 	fmt.Print(prompt[0])
 
-	finish := make(chan struct{}, 1)
 	c := make(chan os.Signal, 1)
-
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
@@ -85,15 +78,12 @@ func (conn *Conn) Interactive(prompt ...string) {
 		conn.errChan <- fmt.Errorf("Control-C")
 	}()
 
-	syscall.SetNonblock(int(os.Stdin.Fd()), true)
-
-	go conn.writeInteractive(prompt[0])
-	go conn.readInteractive(finish, prompt[0])
+	interactiveConn = conn
+	go writeInteractive(prompt[0])
+	go readInteractive(prompt[0])
 
 	for {
-		err := <-conn.errChan
-
-		if err != nil {
+		if err := <-conn.errChan; err != nil {
 			if err.Error() == "EOF" {
 				Info("Got EOF while reading in interactive")
 			}
@@ -102,33 +92,23 @@ func (conn *Conn) Interactive(prompt ...string) {
 				Info("Interrupted")
 			}
 
-			os.Stdin.SetDeadline(time.Now())
-			finish <- struct{}{}
-			time.Sleep(10 * time.Millisecond)
 			break
 		}
 	}
 
-	syscall.SetNonblock(int(os.Stdin.Fd()), false)
-
-	close(finish)
 	conn.Close()
 }
 
 func (conn *Conn) Close() {
 	if !conn.isClosed {
 		conn.isClosed = true
-
 		conn.stdin.Close()
 		conn.stdout.Close()
 
 		if info.isProcess {
 			Info("Stopped process '%s' (pid %d)\n", info.command, info.pid)
 			syscall.Kill(info.pid, syscall.SIGKILL)
-		} else if info.isRemote {
-			Info("Closed connection to %s port %s\n", info.host, info.port)
-			conn.conn.Close()
-		} else if info.isListen {
+		} else if info.isRemote || info.isListen {
 			Info("Closed connection to %s port %s\n", info.host, info.port)
 			conn.conn.Close()
 		}
